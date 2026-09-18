@@ -1,56 +1,79 @@
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
+import { useAdmin } from '../admin'
 
-// 遗愿清单：第一次来访会种下这几颗种子，之后都存在浏览器 localStorage
-const SEEDS = [
-  '去看一次真正的极光',
-  '学会一首能完整弹下来的曲子',
-  '和爸妈拍一张不催不赶的合照',
-  '原谅一件记了很多年的小事',
-  '把熬夜戒成一个传说',
-]
-const KEY = 'rip.wishes.v1'
+const { isAdmin, authHeaders } = useAdmin()
 
-const wishes = ref(load())
+const wishes = ref([])
+const state = ref('loading') // loading | ready | error
 const draft = ref('')
+const mutError = ref('')
 
-function load() {
+async function load() {
+  state.value = 'loading'
   try {
-    const raw = localStorage.getItem(KEY)
-    if (raw) return JSON.parse(raw)
-  } catch {}
-  return SEEDS.map((text, i) => ({ id: i + 1, text, done: false }))
+    const res = await fetch('/api/wishes')
+    if (!res.ok) throw new Error()
+    wishes.value = (await res.json()).wishes
+    state.value = 'ready'
+  } catch {
+    state.value = 'error'
+  }
 }
-function save() {
-  try {
-    localStorage.setItem(KEY, JSON.stringify(wishes.value))
-  } catch {}
-}
-function add() {
+onMounted(load)
+
+const doneCount = computed(() => wishes.value.filter((w) => w.done).length)
+
+async function add() {
   const text = draft.value.trim()
   if (!text) return
-  wishes.value.push({ id: Date.now(), text, done: false })
-  draft.value = ''
-  save()
+  mutError.value = ''
+  const res = await fetch('/api/wishes', {
+    method: 'POST',
+    headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text }),
+  })
+  if (res.status === 403) {
+    mutError.value = '管理会话已过期，请重新写入令牌。'
+    return
+  }
+  if (res.ok) {
+    wishes.value.push(await res.json())
+    draft.value = ''
+  }
 }
-function toggle(w) {
-  w.done = !w.done
-  save()
+
+async function toggle(w) {
+  mutError.value = ''
+  const res = await fetch(`/api/wishes/${w.id}`, {
+    method: 'PATCH',
+    headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ done: !w.done }),
+  })
+  if (res.status === 403) {
+    mutError.value = '管理会话已过期，请重新写入令牌。'
+    return
+  }
+  if (res.ok) w.done = !w.done
 }
-function remove(w) {
-  wishes.value = wishes.value.filter((x) => x !== w)
-  save()
+
+async function remove(w) {
+  const res = await fetch(`/api/wishes/${w.id}`, {
+    method: 'DELETE',
+    headers: authHeaders(),
+  })
+  if (res.ok) {
+    wishes.value = wishes.value.filter((x) => x !== w)
+  }
 }
-const doneCount = computed(() => wishes.value.filter((w) => w.done).length)
 </script>
 
 <template>
   <section class="scene">
     <span class="ghost" aria-hidden="true">愿</span>
 
-    <!-- 左侧线稿：星夜、流星与远山 -->
+    <!-- 左侧：星夜、流星与远山（固定背景） -->
     <div class="ornament" aria-hidden="true">
-      <div class="moon"></div>
       <svg class="art" viewBox="0 0 320 360">
       <g fill="none" stroke="#cfcfcf" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round">
         <defs>
@@ -58,16 +81,35 @@ const doneCount = computed(() => wishes.value.filter((w) => w.done).length)
             id="sparkle"
             d="M 0 -7 C 1 -2 2 -1 7 0 C 2 1 1 2 0 7 C -1 2 -2 1 -7 0 C -2 -1 -1 -2 0 -7 Z"
           />
-          <linearGradient id="hill-fade" gradientUnits="userSpaceOnUse" x1="0" y1="278" x2="0" y2="360">
-            <stop offset="0" stop-color="#ffffff" stop-opacity="1" />
-            <stop offset="0.72" stop-color="#ffffff" stop-opacity="0.5" />
-            <stop offset="1" stop-color="#ffffff" stop-opacity="0" />
-          </linearGradient>
           <linearGradient id="shoot-fade" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="-70" y2="-34">
             <stop offset="0" stop-color="#ffffff" stop-opacity="0.9" />
             <stop offset="1" stop-color="#ffffff" stop-opacity="0" />
           </linearGradient>
+          <filter id="rough-hills" x="-20%" y="-20%" width="140%" height="140%">
+            <feTurbulence type="fractalNoise" baseFrequency="0.035" numOctaves="3" seed="5" result="n" />
+            <feDisplacementMap in="SourceGraphic" in2="n" scale="6" />
+          </filter>
+          <filter id="rough-moon" x="-30%" y="-30%" width="160%" height="160%">
+            <feTurbulence type="fractalNoise" baseFrequency="0.06" numOctaves="3" seed="9" result="n" />
+            <feDisplacementMap in="SourceGraphic" in2="n" scale="3.5" />
+          </filter>
         </defs>
+
+        <!-- 手绘满月 -->
+        <g filter="url(#rough-moon)">
+          <circle cx="246" cy="78" r="46" fill="#ffffff" opacity="0.05" stroke="none" />
+          <circle
+            cx="248"
+            cy="78"
+            r="30"
+            fill="rgba(238, 238, 238, 0.1)"
+            stroke="#e8e8e8"
+            stroke-width="1.5"
+          />
+          <circle cx="238" cy="68" r="5" opacity="0.25" />
+          <circle cx="257" cy="86" r="3.5" opacity="0.2" />
+          <circle cx="252" cy="64" r="2.5" opacity="0.18" />
+        </g>
 
         <g class="stars" fill="#e8e8e8" stroke="none">
           <use class="star s1" href="#sparkle" transform="translate(48 140)" />
@@ -91,57 +133,68 @@ const doneCount = computed(() => wishes.value.filter((w) => w.done).length)
           </g>
         </g>
 
-        <!-- 三层远山 -->
-        <path
-          d="M 0 312 C 50 292 96 286 140 300 C 180 312 220 288 258 296 C 284 302 306 298 320 304 L 320 360 L 0 360 Z"
-          fill="url(#hill-fade)"
-          fill-opacity="0.05"
-          stroke="none"
-        />
-        <path
-          d="M 0 330 C 44 314 88 310 132 322 C 176 334 214 316 254 322 C 282 326 304 322 320 326 L 320 360 L 0 360 Z"
-          fill="url(#hill-fade)"
-          fill-opacity="0.08"
-          stroke="none"
-        />
-        <path
-          d="M 0 348 C 60 336 120 334 176 342 C 232 350 282 342 320 346 L 320 360 L 0 360 Z"
-          fill="url(#hill-fade)"
-          fill-opacity="0.12"
-          stroke="none"
-        />
+        <!-- 三层远山：手绘棱线 -->
+        <g filter="url(#rough-hills)">
+          <path
+            d="M -20 300 C 40 278 96 272 140 286 C 180 298 224 276 262 284 C 288 290 308 286 330 292"
+            stroke-opacity="0.5"
+          />
+          <path
+            d="M -20 322 C 44 306 88 302 132 314 C 176 326 218 308 258 314 C 286 318 308 314 330 318"
+            stroke-opacity="0.35"
+          />
+          <path
+            d="M -20 344 C 60 332 120 330 176 338 C 232 346 282 338 330 342"
+            stroke-opacity="0.25"
+          />
+        </g>
       </g>
       </svg>
     </div>
 
-    <header class="topbar">
+    <!-- 上下遮罩：透明到模糊压暗，保证文字可读 -->
+    <div class="veil top" aria-hidden="true"></div>
+    <div class="veil bottom" aria-hidden="true"></div>
+
+    <!-- 左下：标题与计数（管理时此处还有添加栏） -->
+    <header class="titleblock">
       <p class="title">死前想做完的事</p>
       <p class="en">Bucket List</p>
-    </header>
-
-    <section class="board">
       <p class="counter">{{ doneCount }} / {{ wishes.length }} 已完成</p>
-      <ul class="list">
-        <li v-for="(w, i) in wishes" :key="w.id" :class="{ done: w.done }">
-          <span class="num">{{ String(i + 1).padStart(2, '0') }}</span>
-          <button
-            class="tick"
-            type="button"
-            :aria-pressed="w.done"
-            :title="w.done ? '标记为未完成' : '标记为已完成'"
-            @click="toggle(w)"
-          ></button>
-          <span class="text">{{ w.text }}</span>
-          <button class="del" type="button" title="划掉这一条" @click="remove(w)">✕</button>
-        </li>
-        <li v-if="!wishes.length" class="empty">还没有写下任何事。</li>
-      </ul>
-      <form class="add" @submit.prevent="add">
+      <form v-if="isAdmin" class="addbar" @submit.prevent="add">
         <input v-model="draft" placeholder="写下一件事，回车记下" maxlength="40" />
       </form>
-    </section>
+      <p v-if="mutError" class="muterr">{{ mutError }}</p>
+    </header>
 
-    <footer class="hint">打过勾的，就当作已经无悔。</footer>
+    <!-- 右侧：从上到下的大列表竖栏 -->
+    <div class="listwrap">
+      <template v-if="state === 'ready'">
+        <ul class="list">
+          <li v-for="(w, i) in wishes" :key="w.id" :class="{ done: w.done }">
+            <span class="num">{{ String(i + 1).padStart(2, '0') }}</span>
+            <span v-if="!isAdmin" class="tick readonly"></span>
+            <button
+              v-else
+              class="tick"
+              type="button"
+              :aria-pressed="w.done"
+              :title="w.done ? '标记为未完成' : '标记为已完成'"
+              @click="toggle(w)"
+            ></button>
+            <span class="text">{{ w.text }}</span>
+            <button v-if="isAdmin" class="del" type="button" title="划掉这一条" @click="remove(w)">✕</button>
+          </li>
+          <li v-if="!wishes.length" class="empty">还没有写下任何事。</li>
+        </ul>
+        <p class="endhint">打过勾的，就当作已经无悔。</p>
+      </template>
+      <p v-else-if="state === 'loading'" class="state">正在展开清单…</p>
+      <p v-else class="state">
+        清单暂时读不出来。
+        <button class="retry" type="button" @click="load">重试</button>
+      </p>
+    </div>
   </section>
 </template>
 
@@ -149,13 +202,19 @@ const doneCount = computed(() => wishes.value.filter((w) => w.done).length)
 .scene {
   position: fixed;
   inset: 0;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
   -webkit-user-select: none;
   user-select: none;
+  scrollbar-width: none;
+}
+
+.scene::-webkit-scrollbar {
+  display: none;
 }
 
 .ghost {
-  position: absolute;
+  position: fixed;
   z-index: 1;
   right: 0;
   top: 50%;
@@ -174,17 +233,16 @@ const doneCount = computed(() => wishes.value.filter((w) => w.done).length)
   }
 }
 
-/* 左侧夜景 */
+/* 左侧夜景：固定背景 */
 .ornament {
-  position: absolute;
+  position: fixed;
   z-index: 2;
-  left: 6vw;
+  left: 4vw;
   top: 50%;
   transform: translateY(-50%);
-  width: clamp(240px, 28vw, 390px);
+  width: clamp(300px, 44vw, 640px);
   pointer-events: none;
   opacity: 0.9;
-  /* 边缘渐隐，让画面融进黑背景 */
   -webkit-mask-image: radial-gradient(100% 100% at 50% 42%, #000 45%, transparent 82%);
   mask-image: radial-gradient(100% 100% at 50% 42%, #000 45%, transparent 82%);
 }
@@ -195,7 +253,6 @@ const doneCount = computed(() => wishes.value.filter((w) => w.done).length)
   height: auto;
 }
 
-/* CSS 光晕月亮：亮核 + 分层辉光 */
 .moon {
   position: absolute;
   left: 70%;
@@ -266,69 +323,119 @@ const doneCount = computed(() => wishes.value.filter((w) => w.done).length)
   }
 }
 
-.topbar {
-  position: absolute;
-  z-index: 3;
-  top: 5vh;
-  left: 7vw;
-  right: 7vw;
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
+/* 上下遮罩：透明到模糊压暗 */
+.veil {
+  position: fixed;
+  left: 0;
+  right: 0;
+  height: 24vh;
+  z-index: 4;
   pointer-events: none;
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
+}
+
+.veil.top {
+  top: 0;
+  background: linear-gradient(180deg, rgba(2, 2, 2, 0.55) 0%, rgba(2, 2, 2, 0) 100%);
+  -webkit-mask-image: linear-gradient(180deg, #000 0%, transparent 100%);
+  mask-image: linear-gradient(180deg, #000 0%, transparent 100%);
+}
+
+.veil.bottom {
+  bottom: 0;
+  height: 34vh;
+  background: linear-gradient(
+    0deg,
+    rgba(2, 2, 2, 0.78) 0%,
+    rgba(2, 2, 2, 0.45) 55%,
+    rgba(2, 2, 2, 0) 100%
+  );
+  -webkit-mask-image: linear-gradient(0deg, #000 0%, transparent 100%);
+  mask-image: linear-gradient(0deg, #000 0%, transparent 100%);
+}
+
+/* 左下标题与计数：固定，不随内容滚动 */
+.titleblock {
+  position: fixed;
+  z-index: 5;
+  left: 7vw;
+  bottom: 9vh;
 }
 
 .title {
   margin: 0;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 400;
-  letter-spacing: 0.5em;
-  color: #a5a5a5;
+  letter-spacing: 0.55em;
+  color: #c5c5c5;
+  text-shadow:
+    0 0 12px rgba(0, 0, 0, 0.9),
+    0 0 4px rgba(0, 0, 0, 0.8);
 }
 
 .en {
-  margin: 0;
+  margin: 1.4vh 0 0;
   font-size: 10px;
   letter-spacing: 0.42em;
   text-transform: uppercase;
   color: #8a8a8a;
-}
-
-.board {
-  position: absolute;
-  z-index: 3;
-  right: 9vw;
-  top: 50%;
-  transform: translateY(-50%);
-  width: min(560px, 44vw);
-  max-height: 72vh;
-  display: flex;
-  flex-direction: column;
-  /* 深色底板：把文字从背景巨字上托出来 */
-  background: rgba(2, 2, 2, 0.55);
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  border-radius: 3px;
-  padding: 2.4vh 20px;
+  text-shadow: 0 0 10px rgba(0, 0, 0, 0.9);
 }
 
 .counter {
-  flex: none;
-  margin: 0 0 2.4vh;
+  margin: 2.6vh 0 0;
   font-size: 11px;
   letter-spacing: 0.4em;
   color: #9c9c9c;
+  text-shadow: 0 0 10px rgba(0, 0, 0, 0.9);
 }
 
-/* 只有清单本身滚动，计数器与输入框固定 */
+.addbar {
+  margin: 2vh 0 0;
+}
+
+.addbar input {
+  width: min(300px, 100%);
+  padding: 10px 2px;
+  background: none;
+  border: 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.3);
+  color: #eaeaea;
+  font: inherit;
+  font-size: 14px;
+  letter-spacing: 0.12em;
+  outline: none;
+  transition: border-color 0.3s;
+}
+
+.addbar input::placeholder {
+  color: #7c7c7c;
+}
+
+.addbar input:focus {
+  border-bottom-color: #b5b5b5;
+}
+
+.muterr {
+  margin: 1.2vh 0 0;
+  font-size: 11px;
+  letter-spacing: 0.2em;
+  color: #b0b0b0;
+}
+
+/* 右侧大列表竖栏：随页面自然滚动，尾部留白让末项能滚到屏幕中部 */
+.listwrap {
+  position: relative;
+  z-index: 3;
+  width: min(430px, 34vw);
+  margin: 45vh 9vw 45vh auto;
+}
+
 .list {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
   margin: 0;
-  padding: 0 8px 0 0;
+  padding: 0;
   list-style: none;
-  scrollbar-width: thin;
-  scrollbar-color: #2e2e2e transparent;
 }
 
 li {
@@ -355,6 +462,10 @@ li {
   cursor: pointer;
   position: relative;
   transition: border-color 0.3s, background 0.3s;
+}
+
+.tick.readonly {
+  cursor: default;
 }
 
 .tick:hover {
@@ -430,53 +541,66 @@ li:hover .del {
   border-bottom: none;
 }
 
-.add {
-  flex: none;
+.state {
+  margin: 4vh 0;
+  font-size: 13px;
+  letter-spacing: 0.3em;
+  color: #8a8a8a;
+  text-align: center;
 }
 
-.add input {
-  width: 100%;
-  margin-top: 2.2vh;
-  padding: 10px 2px;
+.retry {
+  margin-left: 10px;
   background: none;
   border: 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.3);
-  color: #eaeaea;
+  color: #d0d0d0;
   font: inherit;
-  font-size: 14px;
-  letter-spacing: 0.12em;
-  outline: none;
-  transition: border-color 0.3s;
+  font-size: 13px;
+  letter-spacing: 0.2em;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  cursor: pointer;
 }
 
-.add input::placeholder {
-  color: #7c7c7c;
-}
-
-.add input:focus {
-  border-bottom-color: #b5b5b5;
-}
-
-.hint {
-  position: absolute;
-  z-index: 3;
-  left: 7vw;
-  bottom: 6vh;
-  margin: 0;
+.endhint {
+  margin: 3vh 0 0;
+  text-align: center;
   font-size: 11px;
   letter-spacing: 0.3em;
   color: #8f8f8f;
-  pointer-events: none;
 }
 
 @media (max-width: 820px) {
-  .board {
-    left: 50%;
-    right: auto;
-    top: 50%;
-    transform: translate(-50%, -50%);
-    width: 84vw;
-    max-height: 62vh;
+  .ornament {
+    display: block;
+    position: relative;
+    left: 0;
+    top: 0;
+    transform: none;
+    width: 70vw;
+    margin: 12vh auto 0;
+    opacity: 0.9;
+  }
+
+  .titleblock {
+    position: static;
+    width: auto;
+    padding: 0 8vw;
+    margin-top: 1vh;
+    text-align: center;
+  }
+
+  .listwrap {
+    width: auto;
+    margin: 2vh 8vw 12vh;
+  }
+
+  .veil.top {
+    display: none;
+  }
+
+  .veil.bottom {
+    height: 14vh;
   }
 
   .ghost {
@@ -485,35 +609,8 @@ li:hover .del {
     transform: translate(8%, 0);
   }
 
-  .ornament {
-    display: none;
-  }
-
-  .topbar {
-    top: 3.5vh;
-    left: 6vw;
-    right: 6vw;
-    flex-direction: column;
-    align-items: center;
-    gap: 6px;
-    text-align: center;
-  }
-
-  .en {
-    font-size: 9px;
-  }
-
   .text {
     font-size: 14px;
-  }
-
-  .hint {
-    left: 6vw;
-    right: 6vw;
-    bottom: 6.5vh;
-    text-align: center;
-    font-size: 10px;
-    letter-spacing: 0.22em;
   }
 }
 

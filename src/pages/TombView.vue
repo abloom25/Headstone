@@ -1,5 +1,5 @@
 <script setup>
-import { onBeforeUnmount, ref } from 'vue'
+import { onBeforeUnmount, onMounted, ref } from 'vue'
 import epitaph from '../epitaph'
 import Tombstone from '../components/Tombstone.vue'
 import FlowerSpot from '../components/FlowerSpot.vue'
@@ -20,28 +20,30 @@ function toggleCandle() {
 }
 onBeforeUnmount(() => clearTimeout(smokeTimer))
 
-// 献花：点任意处，一朵白花落在地面线前，最多留 24 朵
+// 献花：位置按屏幕百分比记录；窗口尺寸一变就直接清空（重种即可）
 const flowers = ref([])
-const groundEl = ref(null)
 let seq = 0
 function plantFlower(e) {
-  const rect = groundEl.value.getBoundingClientRect()
-  const vw = window.innerWidth
-  const vh = window.innerHeight
-  const xMin = Math.max(4, (rect.left / vw) * 100 - 3)
-  const xMax = Math.min(96, (rect.right / vw) * 100 + 3)
-  const vx = (e.clientX / vw) * 100
-  const yPx = rect.bottom + 6 + Math.random() * 48
+  const x = Math.min(92, Math.max(8, (e.clientX / window.innerWidth) * 100 + (Math.random() * 8 - 4)))
+  const y = 78 + Math.random() * 8
   flowers.value.push({
     id: ++seq,
-    x: Math.min(xMax, Math.max(xMin, vx + (Math.random() * 8 - 4))),
-    y: (yPx / vh) * 100,
+    x,
+    y,
     rot: Math.random() * 24 - 12,
     s: 0.85 + Math.random() * 0.5,
-    delay: Math.random() * 0.15,
   })
   if (flowers.value.length > 24) flowers.value.shift()
 }
+
+function onResize() {
+  flowers.value = []
+}
+onMounted(() => window.addEventListener('resize', onResize))
+onBeforeUnmount(() => {
+  window.removeEventListener('resize', onResize)
+  clearTimeout(smokeTimer)
+})
 </script>
 
 <template>
@@ -69,7 +71,7 @@ function plantFlower(e) {
         <span class="stick" aria-hidden="true"></span>
       </button>
     </section>
-    <div ref="groundEl" class="ground" aria-hidden="true"></div>
+    <div class="ground" aria-hidden="true"></div>
 
     <FlowerSpot :flowers="flowers" />
 

@@ -5,7 +5,7 @@ import TombView from './pages/TombView.vue'
 import WishView from './pages/WishView.vue'
 import VoiceView from './pages/VoiceView.vue'
 
-// 三页：碑（主页）· 愿（遗愿清单）· 言（留言）
+// 三页：碑（主页）· 愿（遗愿清单）· 言（留言）；「解锁管理」入口在页面内
 const views = { bei: TombView, yuan: WishView, yan: VoiceView }
 const titles = { bei: '墓 · RIP', yuan: '愿 · RIP', yan: '言 · RIP' }
 const navs = [
@@ -93,20 +93,19 @@ onBeforeUnmount(() => window.removeEventListener('hashchange', fromHash))
 }
 
 .page-enter-active {
-  transition: opacity 0.6s ease, transform 0.6s ease;
+  transition: transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .page-leave-active {
-  transition: opacity 0.3s ease;
+  transition: transform 0.45s cubic-bezier(0.5, 0, 0.75, 0.4);
 }
 
 .page-enter-from {
-  opacity: 0;
-  transform: translateY(14px);
+  transform: translateY(22px);
 }
 
 .page-leave-to {
-  opacity: 0;
+  transform: translateY(-16px);
 }
 
 @media (prefers-reduced-motion: reduce) {
