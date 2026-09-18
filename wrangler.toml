@@ -1,9 +1,8 @@
-name = "rip"
+name = "headstone"
 compatibility_date = "2026-01-01"
 pages_build_output_dir = "dist"
 
 [[d1_databases]]
 binding = "DB"
 database_name = "rip-db"
-# 部署时替换为 `npx wrangler d1 create rip-db` 输出的 database_id
-database_id = "00000000-0000-0000-0000-000000000000"
+database_id = "5b481022-2911-4792-af52-a3906a8e0e23"
