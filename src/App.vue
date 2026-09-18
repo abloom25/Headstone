@@ -21,15 +21,22 @@ function toggleCandle() {
 }
 onBeforeUnmount(() => clearTimeout(smokeTimer))
 
-// 献花：点任意处，一朵白花落在碑前，最多留 24 朵
+// 献花：点任意处，一朵白花落在地面线前，最多留 24 朵
 const flowers = ref([])
+const groundEl = ref(null)
 let seq = 0
 function plantFlower(e) {
-  const vx = (e.clientX / window.innerWidth) * 100
+  const rect = groundEl.value.getBoundingClientRect()
+  const vw = window.innerWidth
+  const vh = window.innerHeight
+  const xMin = Math.max(4, (rect.left / vw) * 100 - 3)
+  const xMax = Math.min(96, (rect.right / vw) * 100 + 3)
+  const vx = (e.clientX / vw) * 100
+  const yPx = rect.bottom + 6 + Math.random() * 48
   flowers.value.push({
     id: ++seq,
-    x: Math.min(92, Math.max(8, vx + (Math.random() * 8 - 4))),
-    y: 80 + Math.random() * 8,
+    x: Math.min(xMax, Math.max(xMin, vx + (Math.random() * 8 - 4))),
+    y: (yPx / vh) * 100,
     rot: Math.random() * 24 - 12,
     s: 0.85 + Math.random() * 0.5,
     delay: Math.random() * 0.15,
@@ -41,26 +48,42 @@ function plantFlower(e) {
 <template>
   <main class="scene" @click="plantFlower">
     <Dust />
-    <p class="title">{{ epitaph.title }}</p>
+    <span class="ghost" aria-hidden="true">{{ epitaph.ghost }}</span>
 
-    <Tombstone />
-    <div class="ground" aria-hidden="true"></div>
+    <header class="topbar">
+      <p class="title">{{ epitaph.title }}</p>
+      <p class="en">{{ epitaph.en }}</p>
+    </header>
 
-    <button
-      class="candle"
-      type="button"
-      :aria-pressed="lit"
-      :title="lit ? '熄灭烛火' : '点亮烛火'"
-      @click.stop="toggleCandle"
-    >
-      <span v-if="smoking && !lit" class="smoke" aria-hidden="true"><i /><i /><i /></span>
-      <span v-show="lit" class="halo" aria-hidden="true"></span>
-      <span v-show="lit" class="flame" aria-hidden="true"></span>
-      <span class="wick" aria-hidden="true"></span>
-      <span class="stick" aria-hidden="true"></span>
-    </button>
+    <section class="stage">
+      <Tombstone />
+      <button
+        class="candle"
+        type="button"
+        :aria-pressed="lit"
+        :title="lit ? '熄灭烛火' : '点亮烛火'"
+        @click.stop="toggleCandle"
+      >
+        <span v-if="smoking && !lit" class="smoke" aria-hidden="true"><i /><i /><i /></span>
+        <span v-show="lit" class="halo" aria-hidden="true"></span>
+        <span v-show="lit" class="flame" aria-hidden="true"></span>
+        <span class="wick" aria-hidden="true"></span>
+        <span class="stick" aria-hidden="true"></span>
+      </button>
+    </section>
+    <div ref="groundEl" class="ground" aria-hidden="true"></div>
 
     <FlowerSpot :flowers="flowers" />
+
+    <section class="panel">
+      <div class="words">
+        <h1 class="name">{{ epitaph.name }}</h1>
+        <div class="rule" aria-hidden="true"></div>
+        <p class="born">生于 · {{ epitaph.born }}</p>
+        <p class="died">卒于 · {{ epitaph.died }}</p>
+      </div>
+      <p class="quote-v">「{{ epitaph.quote }}」</p>
+    </section>
 
     <footer class="hint">轻点任意处，献一朵白花&ensp;·&ensp;轻点烛火，点亮或熄灭</footer>
   </main>
@@ -70,57 +93,181 @@ function plantFlower(e) {
 .scene {
   position: fixed;
   inset: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: flex-end;
-  padding-bottom: 20vh; /* 石碑落在地面上，而不是屏幕底边 */
-  background: radial-gradient(120vw 90vh at 50% 32%, #101010 0%, #060606 55%, #020202 100%);
+  background: radial-gradient(120vw 90vh at 30% 35%, #101010 0%, #060606 55%, #020202 100%);
   overflow: hidden;
   cursor: pointer;
   -webkit-user-select: none;
   user-select: none;
 }
 
-.title {
+/* 背景描边巨字，压在排版区后面 */
+.ghost {
   position: absolute;
-  top: 7vh;
-  left: 0;
+  z-index: 1;
   right: 0;
-  z-index: 3;
-  margin: 0;
-  text-align: center;
-  font-size: 14px;
-  font-weight: 400;
-  letter-spacing: 0.85em;
-  text-indent: 0.85em;
-  color: #8a8a8a;
+  top: 50%;
+  transform: translate(6%, -54%);
+  font-size: 76vh;
+  line-height: 1;
+  font-weight: 600;
+  color: transparent;
+  -webkit-text-stroke: 1.5px rgba(255, 255, 255, 0.065);
   pointer-events: none;
-  animation: fade 2s ease-out both;
+  animation: ghost-in 2.4s ease-out both;
+}
+
+@supports not (-webkit-text-stroke: 1px #fff) {
+  .ghost {
+    color: rgba(255, 255, 255, 0.04);
+  }
+}
+
+/* 顶栏：中文在左，英文在右 */
+.topbar {
+  position: absolute;
+  z-index: 3;
+  top: 5vh;
+  left: 7vw;
+  right: 7vw;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  pointer-events: none;
+  animation: fade 1.8s ease-out both;
+}
+
+.title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 400;
+  letter-spacing: 0.5em;
+  color: #8a8a8a;
+}
+
+.en {
+  margin: 0;
+  font-size: 10px;
+  letter-spacing: 0.42em;
+  text-transform: uppercase;
+  color: #585858;
+}
+
+/* 左侧的石碑与地面 */
+.stage {
+  position: absolute;
+  z-index: 2;
+  left: 10vw;
+  bottom: 20vh;
+  width: min(38vw, 56vh, 320px);
+}
+
+/* 碑身始终跟随舞台宽度，避免组件自带宽度溢出容器 */
+.stage :deep(.stone) {
+  width: 100%;
 }
 
 .ground {
   position: absolute;
   left: 6vw;
-  right: 6vw;
   bottom: 20vh;
+  width: 52vw;
   height: 1px;
   background: linear-gradient(
     90deg,
     transparent,
-    rgba(255, 255, 255, 0.32) 18%,
-    rgba(255, 255, 255, 0.32) 82%,
+    rgba(255, 255, 255, 0.32) 12%,
+    rgba(255, 255, 255, 0.32) 88%,
     transparent
   );
   pointer-events: none;
+}
+
+/* 右侧排版区：大字名字 + 生卒 + 竖排墓志铭 */
+.panel {
+  position: absolute;
+  z-index: 3;
+  right: 9vw;
+  top: 50%;
+  transform: translateY(-52%);
+  display: flex;
+  align-items: stretch;
+  gap: 3.2vw;
+  pointer-events: none;
+}
+
+.words {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.name {
+  margin: 0;
+  font-size: clamp(88px, 15vw, 200px);
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: 0.04em;
+  color: #f0f0f0;
+  animation: fade-up 1s cubic-bezier(0.22, 1, 0.36, 1) 0.35s both;
+}
+
+.rule {
+  width: 76px;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.4);
+  margin: 4.5vh 0 3.2vh;
+  transform-origin: left center;
+  animation: grow 0.9s cubic-bezier(0.22, 1, 0.36, 1) 0.65s both;
+}
+
+.born,
+.died {
+  margin: 0;
+  font-size: 13px;
+  letter-spacing: 0.32em;
+  color: #9a9a9a;
+  line-height: 2.1;
+  animation: fade-up 1s ease-out both;
+}
+
+.born {
+  animation-delay: 0.8s;
+}
+
+.died {
+  animation-delay: 0.95s;
+}
+
+.quote-v {
+  margin: 0;
+  writing-mode: vertical-rl;
+  font-size: 19px;
+  letter-spacing: 0.42em;
+  color: #d6d6d6;
+  border-left: 1px solid rgba(255, 255, 255, 0.16);
+  padding-left: 3.2vw;
+  animation: fade-up 1.1s ease-out 1.1s both;
+}
+
+.hint {
+  position: absolute;
+  z-index: 3;
+  left: 7vw;
+  bottom: 6vh;
+  margin: 0;
+  font-size: 11px;
+  letter-spacing: 0.3em;
+  color: #5a5a5a;
+  pointer-events: none;
+  animation: fade 1.8s ease-out 0.4s both;
 }
 
 /* --- 蜡烛 --- */
 .candle {
   position: absolute;
   z-index: 4;
-  bottom: calc(20vh - 1px);
-  left: calc(50% - min(150px, 34vw));
+  right: -58px;
+  bottom: 0;
   width: 44px;
   height: 82px;
   padding: 0;
@@ -206,22 +353,6 @@ function plantFlower(e) {
   animation-delay: 1.2s;
 }
 
-.hint {
-  position: absolute;
-  bottom: 6vh;
-  left: 0;
-  right: 0;
-  z-index: 3;
-  margin: 0;
-  text-align: center;
-  font-size: 12px;
-  letter-spacing: 0.3em;
-  text-indent: 0.3em;
-  color: #616161;
-  pointer-events: none;
-  animation: fade 2.4s ease-out both;
-}
-
 @keyframes flick {
   from {
     transform: translateX(-50%) rotate(-2.5deg) scale(0.96, 1);
@@ -263,12 +394,123 @@ function plantFlower(e) {
   }
 }
 
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+}
+
+@keyframes grow {
+  from {
+    transform: scaleX(0);
+  }
+}
+
+@keyframes ghost-in {
+  from {
+    opacity: 0;
+  }
+}
+
+/* --- 窄屏：碑在上、排版在下，仍然不对称留白 --- */
+@media (max-width: 820px) {
+  .scene {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-end;
+    padding-bottom: 6.5vh;
+  }
+
+  .stage {
+    position: relative;
+    left: auto;
+    bottom: auto;
+    width: min(58vw, 34vh);
+  }
+
+  .ground {
+    position: static;
+    width: 84vw;
+  }
+
+  .panel {
+    position: static;
+    transform: none;
+    margin: 4vh 0 0;
+    padding: 0 8vw;
+    gap: 9vw;
+    justify-content: center;
+  }
+
+  .name {
+    font-size: clamp(60px, 17vw, 84px);
+  }
+
+  .rule {
+    margin: 2vh 0 1.6vh;
+  }
+
+  .born,
+  .died {
+    font-size: 11px;
+    line-height: 2;
+  }
+
+  .quote-v {
+    font-size: 15px;
+    letter-spacing: 0.34em;
+    padding-left: 6vw;
+    max-height: 26vh;
+  }
+
+  .ghost {
+    font-size: 58vw;
+    top: 2vh;
+    transform: translate(8%, 0);
+  }
+
+  .topbar {
+    top: 3.5vh;
+    left: 6vw;
+    right: 6vw;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    text-align: center;
+  }
+
+  .en {
+    font-size: 9px;
+  }
+
+  .hint {
+    left: 6vw;
+    right: 6vw;
+    bottom: 2vh;
+    text-align: center;
+    font-size: 10px;
+    letter-spacing: 0.22em;
+  }
+
+  .candle {
+    right: -46px;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .flame,
   .halo,
   .smoke i,
-  .title,
-  .hint {
+  .topbar,
+  .hint,
+  .ghost,
+  .name,
+  .rule,
+  .born,
+  .died,
+  .quote-v {
     animation: none;
   }
 }

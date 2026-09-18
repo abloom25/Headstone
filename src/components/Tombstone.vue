@@ -33,13 +33,11 @@ import epitaph from '../epitaph'
         stroke-width="1"
       />
 
-      <circle cx="160" cy="76" r="9" fill="none" stroke="rgba(255,255,255,0.35)" stroke-width="1" />
-      <text x="160" y="112" class="rip">RIP</text>
-      <text x="160" y="192" class="name">{{ epitaph.name }}</text>
-      <text x="160" y="234" class="line">生于 · {{ epitaph.born }}</text>
-      <text x="160" y="260" class="line">卒于 · {{ epitaph.died }}</text>
-      <line x1="124" y1="294" x2="196" y2="294" stroke="rgba(255,255,255,0.3)" stroke-width="1" />
-      <text x="160" y="340" class="quote">「{{ epitaph.quote }}」</text>
+      <circle cx="160" cy="110" r="9" fill="none" stroke="rgba(255,255,255,0.35)" stroke-width="1" />
+      <text x="160" y="148" class="rip">RIP</text>
+      <text x="160" y="246" class="name">{{ epitaph.name }}</text>
+      <text x="160" y="298" class="line">生于 · {{ epitaph.born }}</text>
+      <text x="160" y="326" class="line">卒于 · {{ epitaph.died }}</text>
     </svg>
   </figure>
 </template>
@@ -72,21 +70,15 @@ text {
 }
 
 .name {
-  font-size: 50px;
-  letter-spacing: 12px;
-  text-indent: 12px; /* 抵消最后一个字的字距，让视觉居中 */
+  font-size: 46px;
+  letter-spacing: 10px;
+  text-indent: 10px; /* 抵消最后一个字的字距，让视觉居中 */
 }
 
 .line {
   font-size: 13px;
   letter-spacing: 3px;
   fill: #a3a3a3;
-}
-
-.quote {
-  font-size: 15px;
-  letter-spacing: 1px;
-  fill: #d9d9d9;
 }
 
 @keyframes rise {
