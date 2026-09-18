@@ -6,3 +6,13 @@ dist/
 
 
 
+
+# Husky（只提交钩子本身）
+.husky/_/
+
+# Prettier
+.prettiercache
+
+# pnpm
+pnpm-debug.log*
+.pnpm-store/

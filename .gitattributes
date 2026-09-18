@@ -1,0 +1,28 @@
+# 强制全仓库使用 LF 行尾，与 .editorconfig / .prettierrc 保持一致。
+# 本仓库在 Windows 上开发，不加这条 git 会把源码转成 CRLF，
+# prettier 随后报一整屏的 "Delete `␍`"。
+
+# 源码、配置、文档统一 LF
+* text=auto eol=lf
+
+# 二进制文件不做行尾转换
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.webp binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.otf binary
+*.pdf binary
+*.zip binary
+*.gz binary
+*.sqlite binary
+
+# SVG 是文本，但当作资源看待，diff 时折叠
+*.svg text eol=lf linguist-generated=false
+
+# 锁文件不参与 diff review
+pnpm-lock.yaml linguist-generated=true -diff

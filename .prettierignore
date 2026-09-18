@@ -1,0 +1,7 @@
+dist/
+node_modules/
+.wrangler/
+pnpm-lock.yaml
+
+# 迁移脚本按 SQL 习惯手写，不交给 prettier
+migrations/

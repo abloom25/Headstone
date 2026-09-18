@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="墓 · RIP">
+  <title>墓 · RIP</title>
+  <defs>
+    <radialGradient id="bg" cx="0" cy="0" r="1"
+      gradientTransform="translate(154 150) rotate(48) scale(430)">
+      <stop stop-color="#151515" />
+      <stop offset="0.55" stop-color="#090909" />
+      <stop offset="1" stop-color="#020202" />
+    </radialGradient>
+    <linearGradient id="stone" x1="256" y1="120" x2="256" y2="404" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#ffffff" stop-opacity="0.085" />
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0.02" />
+    </linearGradient>
+    <linearGradient id="ground" x1="86" y1="0" x2="426" y2="0" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#e8e8e8" stop-opacity="0" />
+      <stop offset="0.16" stop-color="#e8e8e8" stop-opacity="0.85" />
+      <stop offset="0.84" stop-color="#e8e8e8" stop-opacity="0.85" />
+      <stop offset="1" stop-color="#e8e8e8" stop-opacity="0" />
+    </linearGradient>
+  </defs>
+
+  <rect width="512" height="512" rx="112" fill="url(#bg)" />
+
+  <!-- 碑身：与 src/components/Tombstone.vue 同一条轮廓，
+       为了 16px 下还认得出来，去掉了凿刻抖边滤镜并加粗描边 -->
+  <g fill="none" stroke="#e8e8e8" stroke-linecap="round" stroke-linejoin="round">
+    <path
+      d="M 152 400 L 152 238 C 152 160 198 118 256 118 C 314 118 360 160 360 238 L 360 400"
+      fill="url(#stone)"
+      stroke-width="21"
+    />
+    <circle cx="256" cy="204" r="23" stroke-width="12" stroke-opacity="0.5" />
+    <path d="M 86 400 L 426 400" stroke="url(#ground)" stroke-width="15" />
+  </g>
+</svg>
