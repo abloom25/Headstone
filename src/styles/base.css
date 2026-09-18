@@ -10,7 +10,9 @@ body,
 
 body {
   margin: 0;
-  background: #030303;
+  /* 全局的暗夜光晕，三页共用 */
+  background: radial-gradient(120vw 90vh at 30% 35%, #101010 0%, #060606 55%, #020202 100%) fixed
+    #020202;
   color: #eaeaea;
   font-family: 'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', STSong, SimSun, serif;
   -webkit-font-smoothing: antialiased;

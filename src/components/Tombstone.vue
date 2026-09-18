@@ -66,7 +66,7 @@ text {
 .rip {
   font-size: 14px;
   letter-spacing: 8px;
-  fill: #b5b5b5;
+  fill: #c9c9c9;
 }
 
 .name {
@@ -78,7 +78,7 @@ text {
 .line {
   font-size: 13px;
   letter-spacing: 3px;
-  fill: #a3a3a3;
+  fill: #bdbdbd;
 }
 
 @keyframes rise {
