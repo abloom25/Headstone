@@ -1,6 +1,8 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { useAdmin } from '../admin'
+import AddBar from '../components/AddBar.vue'
+import { timeoutSignal } from '../http'
 
 const { isAdmin, authHeaders } = useAdmin()
 
@@ -12,7 +14,7 @@ const mutError = ref('')
 async function load() {
   state.value = 'loading'
   try {
-    const res = await fetch('/api/wishes')
+    const res = await fetch('/api/wishes', { signal: timeoutSignal(10000) })
     if (!res.ok) throw new Error()
     wishes.value = (await res.json()).wishes
     state.value = 'ready'
@@ -28,42 +30,61 @@ async function add() {
   const text = draft.value.trim()
   if (!text) return
   mutError.value = ''
-  const res = await fetch('/api/wishes', {
-    method: 'POST',
-    headers: { ...authHeaders(), 'Content-Type': 'application/json' },
-    body: JSON.stringify({ text }),
-  })
-  if (res.status === 403) {
-    mutError.value = '管理会话已过期，请重新写入令牌。'
-    return
-  }
-  if (res.ok) {
+  try {
+    const res = await fetch('/api/wishes', {
+      method: 'POST',
+      headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text }),
+      signal: timeoutSignal(10000),
+    })
+    if (res.status === 403) {
+      mutError.value = '管理会话已过期，请重新登录。'
+      return
+    }
+    if (!res.ok) throw new Error()
     wishes.value.push(await res.json())
     draft.value = ''
+  } catch {
+    mutError.value = '没记下来，再试一次。'
   }
 }
 
 async function toggle(w) {
   mutError.value = ''
-  const res = await fetch(`/api/wishes/${w.id}`, {
-    method: 'PATCH',
-    headers: { ...authHeaders(), 'Content-Type': 'application/json' },
-    body: JSON.stringify({ done: !w.done }),
-  })
-  if (res.status === 403) {
-    mutError.value = '管理会话已过期，请重新写入令牌。'
-    return
+  try {
+    const res = await fetch(`/api/wishes/${w.id}`, {
+      method: 'PATCH',
+      headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ done: !w.done }),
+      signal: timeoutSignal(10000),
+    })
+    if (res.status === 403) {
+      mutError.value = '管理会话已过期，请重新登录。'
+      return
+    }
+    if (!res.ok) throw new Error()
+    w.done = !w.done
+  } catch {
+    mutError.value = '没改成，再试一次。'
   }
-  if (res.ok) w.done = !w.done
 }
 
 async function remove(w) {
-  const res = await fetch(`/api/wishes/${w.id}`, {
-    method: 'DELETE',
-    headers: authHeaders(),
-  })
-  if (res.ok) {
+  mutError.value = ''
+  try {
+    const res = await fetch(`/api/wishes/${w.id}`, {
+      method: 'DELETE',
+      headers: authHeaders(),
+      signal: timeoutSignal(10000),
+    })
+    if (res.status === 403) {
+      mutError.value = '管理会话已过期，请重新登录。'
+      return
+    }
+    if (!res.ok) throw new Error()
     wishes.value = wishes.value.filter((x) => x !== w)
+  } catch {
+    mutError.value = '没删掉，再试一次。'
   }
 }
 </script>
@@ -75,80 +96,105 @@ async function remove(w) {
     <!-- 左侧：星夜、流星与远山（固定背景） -->
     <div class="ornament" aria-hidden="true">
       <svg class="art" viewBox="0 0 320 360">
-      <g fill="none" stroke="#cfcfcf" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round">
-        <defs>
-          <path
-            id="sparkle"
-            d="M 0 -7 C 1 -2 2 -1 7 0 C 2 1 1 2 0 7 C -1 2 -2 1 -7 0 C -2 -1 -1 -2 0 -7 Z"
-          />
-          <linearGradient id="shoot-fade" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="-70" y2="-34">
-            <stop offset="0" stop-color="#ffffff" stop-opacity="0.9" />
-            <stop offset="1" stop-color="#ffffff" stop-opacity="0" />
-          </linearGradient>
-          <filter id="rough-hills" x="-20%" y="-20%" width="140%" height="140%">
-            <feTurbulence type="fractalNoise" baseFrequency="0.035" numOctaves="3" seed="5" result="n" />
-            <feDisplacementMap in="SourceGraphic" in2="n" scale="6" />
-          </filter>
-          <filter id="rough-moon" x="-30%" y="-30%" width="160%" height="160%">
-            <feTurbulence type="fractalNoise" baseFrequency="0.06" numOctaves="3" seed="9" result="n" />
-            <feDisplacementMap in="SourceGraphic" in2="n" scale="3.5" />
-          </filter>
-        </defs>
+        <g
+          fill="none"
+          stroke="#cfcfcf"
+          stroke-width="1.3"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <defs>
+            <path
+              id="sparkle"
+              d="M 0 -7 C 1 -2 2 -1 7 0 C 2 1 1 2 0 7 C -1 2 -2 1 -7 0 C -2 -1 -1 -2 0 -7 Z"
+            />
+            <linearGradient
+              id="shoot-fade"
+              gradientUnits="userSpaceOnUse"
+              x1="0"
+              y1="0"
+              x2="-70"
+              y2="-34"
+            >
+              <stop offset="0" stop-color="#ffffff" stop-opacity="0.9" />
+              <stop offset="1" stop-color="#ffffff" stop-opacity="0" />
+            </linearGradient>
+            <filter id="rough-hills" x="-20%" y="-20%" width="140%" height="140%">
+              <feTurbulence
+                type="fractalNoise"
+                baseFrequency="0.035"
+                numOctaves="3"
+                seed="5"
+                result="n"
+              />
+              <feDisplacementMap in="SourceGraphic" in2="n" scale="6" />
+            </filter>
+            <filter id="rough-moon" x="-30%" y="-30%" width="160%" height="160%">
+              <feTurbulence
+                type="fractalNoise"
+                baseFrequency="0.06"
+                numOctaves="3"
+                seed="9"
+                result="n"
+              />
+              <feDisplacementMap in="SourceGraphic" in2="n" scale="3.5" />
+            </filter>
+          </defs>
 
-        <!-- 手绘满月 -->
-        <g filter="url(#rough-moon)">
-          <circle cx="246" cy="78" r="46" fill="#ffffff" opacity="0.05" stroke="none" />
-          <circle
-            cx="248"
-            cy="78"
-            r="30"
-            fill="rgba(238, 238, 238, 0.1)"
-            stroke="#e8e8e8"
-            stroke-width="1.5"
-          />
-          <circle cx="238" cy="68" r="5" opacity="0.25" />
-          <circle cx="257" cy="86" r="3.5" opacity="0.2" />
-          <circle cx="252" cy="64" r="2.5" opacity="0.18" />
-        </g>
+          <!-- 手绘满月 -->
+          <g filter="url(#rough-moon)">
+            <circle cx="246" cy="78" r="46" fill="#ffffff" opacity="0.05" stroke="none" />
+            <circle
+              cx="248"
+              cy="78"
+              r="30"
+              fill="rgba(238, 238, 238, 0.1)"
+              stroke="#e8e8e8"
+              stroke-width="1.5"
+            />
+            <circle cx="238" cy="68" r="5" opacity="0.25" />
+            <circle cx="257" cy="86" r="3.5" opacity="0.2" />
+            <circle cx="252" cy="64" r="2.5" opacity="0.18" />
+          </g>
 
-        <g class="stars" fill="#e8e8e8" stroke="none">
-          <use class="star s1" href="#sparkle" transform="translate(48 140)" />
-          <use class="star s2" href="#sparkle" transform="translate(36 224) scale(0.7)" />
-          <use class="star s3" href="#sparkle" transform="translate(150 60) scale(0.55)" />
-          <use class="star s4" href="#sparkle" transform="translate(302 214) scale(0.6)" />
-          <use class="star s5" href="#sparkle" transform="translate(210 150) scale(0.5)" />
-          <use class="star s6" href="#sparkle" transform="translate(90 44) scale(0.5)" />
-          <circle cx="30" cy="142" r="1" opacity="0.4" />
-          <circle cx="110" cy="80" r="1.1" opacity="0.35" />
-          <circle cx="200" cy="38" r="1" opacity="0.4" />
-          <circle cx="282" cy="244" r="1" opacity="0.3" />
-          <circle cx="66" cy="182" r="1" opacity="0.3" />
-        </g>
+          <g class="stars" fill="#e8e8e8" stroke="none">
+            <use class="star s1" href="#sparkle" transform="translate(48 140)" />
+            <use class="star s2" href="#sparkle" transform="translate(36 224) scale(0.7)" />
+            <use class="star s3" href="#sparkle" transform="translate(150 60) scale(0.55)" />
+            <use class="star s4" href="#sparkle" transform="translate(302 214) scale(0.6)" />
+            <use class="star s5" href="#sparkle" transform="translate(210 150) scale(0.5)" />
+            <use class="star s6" href="#sparkle" transform="translate(90 44) scale(0.5)" />
+            <circle cx="30" cy="142" r="1" opacity="0.4" />
+            <circle cx="110" cy="80" r="1.1" opacity="0.35" />
+            <circle cx="200" cy="38" r="1" opacity="0.4" />
+            <circle cx="282" cy="244" r="1" opacity="0.3" />
+            <circle cx="66" cy="182" r="1" opacity="0.3" />
+          </g>
 
-        <!-- 流星：划一下，歇一会儿 -->
-        <g transform="translate(120 80)">
-          <g class="shoot">
-            <line x1="0" y1="0" x2="-70" y2="-34" stroke="url(#shoot-fade)" />
-            <circle r="1.8" fill="#ffffff" stroke="none" />
+          <!-- 流星：划一下，歇一会儿 -->
+          <g transform="translate(120 80)">
+            <g class="shoot">
+              <line x1="0" y1="0" x2="-70" y2="-34" stroke="url(#shoot-fade)" />
+              <circle r="1.8" fill="#ffffff" stroke="none" />
+            </g>
+          </g>
+
+          <!-- 三层远山：手绘棱线 -->
+          <g filter="url(#rough-hills)">
+            <path
+              d="M -20 300 C 40 278 96 272 140 286 C 180 298 224 276 262 284 C 288 290 308 286 330 292"
+              stroke-opacity="0.5"
+            />
+            <path
+              d="M -20 322 C 44 306 88 302 132 314 C 176 326 218 308 258 314 C 286 318 308 314 330 318"
+              stroke-opacity="0.35"
+            />
+            <path
+              d="M -20 344 C 60 332 120 330 176 338 C 232 346 282 338 330 342"
+              stroke-opacity="0.25"
+            />
           </g>
         </g>
-
-        <!-- 三层远山：手绘棱线 -->
-        <g filter="url(#rough-hills)">
-          <path
-            d="M -20 300 C 40 278 96 272 140 286 C 180 298 224 276 262 284 C 288 290 308 286 330 292"
-            stroke-opacity="0.5"
-          />
-          <path
-            d="M -20 322 C 44 306 88 302 132 314 C 176 326 218 308 258 314 C 286 318 308 314 330 318"
-            stroke-opacity="0.35"
-          />
-          <path
-            d="M -20 344 C 60 332 120 330 176 338 C 232 346 282 338 330 342"
-            stroke-opacity="0.25"
-          />
-        </g>
-      </g>
       </svg>
     </div>
 
@@ -161,9 +207,16 @@ async function remove(w) {
       <p class="title">死前想做完的事</p>
       <p class="en">Bucket List</p>
       <p class="counter">{{ doneCount }} / {{ wishes.length }} 已完成</p>
-      <form v-if="isAdmin" class="addbar" @submit.prevent="add">
-        <input v-model="draft" placeholder="写下一件事，回车记下" maxlength="40" />
-      </form>
+      <AddBar
+        v-if="isAdmin"
+        v-model="draft"
+        placeholder="写下一件事"
+        :maxlength="40"
+        submit-label="记下"
+        button-on="mobile"
+        width="min(300px, 100%)"
+        @submit="add"
+      />
       <p v-if="mutError" class="muterr">{{ mutError }}</p>
     </header>
 
@@ -171,7 +224,12 @@ async function remove(w) {
     <div class="listwrap">
       <template v-if="state === 'ready'">
         <ul class="list">
-          <li v-for="(w, i) in wishes" :key="w.id" :class="{ done: w.done }">
+          <li
+            v-for="(w, i) in wishes"
+            :key="w.id"
+            :class="{ done: w.done }"
+            :style="{ '--i': Math.min(i, 12) }"
+          >
             <span class="num">{{ String(i + 1).padStart(2, '0') }}</span>
             <span v-if="!isAdmin" class="tick readonly"></span>
             <button
@@ -183,7 +241,9 @@ async function remove(w) {
               @click="toggle(w)"
             ></button>
             <span class="text">{{ w.text }}</span>
-            <button v-if="isAdmin" class="del" type="button" title="划掉这一条" @click="remove(w)">✕</button>
+            <button v-if="isAdmin" class="del" type="button" title="划掉这一条" @click="remove(w)">
+              ✕
+            </button>
           </li>
           <li v-if="!wishes.length" class="empty">还没有写下任何事。</li>
         </ul>
@@ -391,32 +451,6 @@ async function remove(w) {
   text-shadow: 0 0 10px rgba(0, 0, 0, 0.9);
 }
 
-.addbar {
-  margin: 2vh 0 0;
-}
-
-.addbar input {
-  width: min(300px, 100%);
-  padding: 10px 2px;
-  background: none;
-  border: 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.3);
-  color: #eaeaea;
-  font: inherit;
-  font-size: 14px;
-  letter-spacing: 0.12em;
-  outline: none;
-  transition: border-color 0.3s;
-}
-
-.addbar input::placeholder {
-  color: #7c7c7c;
-}
-
-.addbar input:focus {
-  border-bottom-color: #b5b5b5;
-}
-
 .muterr {
   margin: 1.2vh 0 0;
   font-size: 11px;
@@ -461,7 +495,9 @@ li {
   background: none;
   cursor: pointer;
   position: relative;
-  transition: border-color 0.3s, background 0.3s;
+  transition:
+    border-color 0.3s,
+    background 0.3s;
 }
 
 .tick.readonly {
@@ -515,7 +551,9 @@ li.done .text {
   font-size: 12px;
   cursor: pointer;
   opacity: 0;
-  transition: opacity 0.3s, color 0.3s;
+  transition:
+    opacity 0.3s,
+    color 0.3s;
   padding: 4px;
 }
 

@@ -1,23 +1,29 @@
 <script setup>
 import { onMounted, ref } from 'vue'
 import { useAdmin } from '../admin'
+import AddBar from '../components/AddBar.vue'
+import { timeoutSignal } from '../http'
 
 const { isAdmin, authHeaders } = useAdmin()
 
 const voices = ref([])
+// 列表封顶 200 条，计数用后端给的全量值
+const total = ref(0)
 const state = ref('loading') // loading | ready | error
 const draft = ref('')
+const nameDraft = ref('')
+const hp = ref('')
 const postError = ref('')
 
 async function load() {
   state.value = 'loading'
   try {
-    const res = await fetch('/api/voices')
+    const res = await fetch('/api/voices', { signal: timeoutSignal(10000) })
     if (!res.ok) throw new Error()
-    voices.value = (await res.json()).voices
+    const data = await res.json()
+    voices.value = data.voices
+    total.value = data.total ?? data.voices.length
     state.value = 'ready'
-    // 后端已接管，清掉早期存在浏览器里的旧留言
-    localStorage.removeItem('rip.voices.v1')
   } catch {
     state.value = 'error'
   }
@@ -26,20 +32,34 @@ onMounted(load)
 
 async function add() {
   const text = draft.value.trim()
+  const name = nameDraft.value.trim()
   if (!text) return
   postError.value = ''
   try {
     const res = await fetch('/api/voices', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text }),
+      body: JSON.stringify({ name, text, website: hp.value }),
+      signal: timeoutSignal(10000),
     })
     if (res.status === 429) {
-      postError.value = '说得太快啦，歇一会儿。'
+      const e = await res.json().catch(() => ({}))
+      postError.value =
+        e.error === 'daily_limit' ? '今天说到这里啦，明天再来。' : '说得太快啦，歇一会儿。'
+      return
+    }
+    if (res.status === 400) {
+      const e = await res.json().catch(() => ({}))
+      postError.value = e.error === 'link' ? '留言里就不放链接啦。' : '写一句再留下。'
       return
     }
     if (!res.ok) throw new Error()
-    voices.value.unshift(await res.json())
+    const saved = await res.json()
+    // 蜜罐被填时后端假装成功但不入库，这里也不要往列表里塞空壳
+    if (!saved.skipped) {
+      voices.value.unshift(saved)
+      total.value += 1
+    }
     draft.value = ''
   } catch {
     postError.value = '没寄出去，再试一次。'
@@ -47,12 +67,22 @@ async function add() {
 }
 
 async function remove(v) {
-  const res = await fetch(`/api/voices/${v.id}`, {
-    method: 'DELETE',
-    headers: authHeaders(),
-  })
-  if (res.ok) {
+  postError.value = ''
+  try {
+    const res = await fetch(`/api/voices/${v.id}`, {
+      method: 'DELETE',
+      headers: authHeaders(),
+      signal: timeoutSignal(10000),
+    })
+    if (res.status === 403) {
+      postError.value = '管理会话已过期，请重新登录。'
+      return
+    }
+    if (!res.ok) throw new Error()
     voices.value = voices.value.filter((x) => x !== v)
+    total.value = Math.max(0, total.value - 1)
+  } catch {
+    postError.value = '没删掉，再试一次。'
   }
 }
 
@@ -70,69 +100,81 @@ function fmt(ts) {
     <!-- 左侧：信箱与飘信（固定背景） -->
     <div class="ornament" aria-hidden="true">
       <svg class="art" viewBox="30 55 270 275">
-      <g fill="none" stroke="#cfcfcf" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round">
-        <defs>
-          <path
-            id="sparkle"
-            d="M 0 -7 C 1 -2 2 -1 7 0 C 2 1 1 2 0 7 C -1 2 -2 1 -7 0 C -2 -1 -1 -2 0 -7 Z"
-          />
-          <filter id="rough-mail" x="-20%" y="-20%" width="140%" height="140%">
-            <feTurbulence type="fractalNoise" baseFrequency="0.06" numOctaves="3" seed="11" result="n" />
-            <feDisplacementMap in="SourceGraphic" in2="n" scale="4.5" />
-          </filter>
-        </defs>
+        <g
+          fill="none"
+          stroke="#cfcfcf"
+          stroke-width="1.3"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <defs>
+            <path
+              id="sparkle"
+              d="M 0 -7 C 1 -2 2 -1 7 0 C 2 1 1 2 0 7 C -1 2 -2 1 -7 0 C -2 -1 -1 -2 0 -7 Z"
+            />
+            <filter id="rough-mail" x="-20%" y="-20%" width="140%" height="140%">
+              <feTurbulence
+                type="fractalNoise"
+                baseFrequency="0.06"
+                numOctaves="3"
+                seed="11"
+                result="n"
+              />
+              <feDisplacementMap in="SourceGraphic" in2="n" scale="4.5" />
+            </filter>
+          </defs>
 
-        <!-- 飘来的信：手绘抖边 -->
-        <g filter="url(#rough-mail)">
-          <g transform="translate(64 132) rotate(-10)">
-            <g class="letter">
-              <rect x="0" y="0" width="26" height="17" rx="1.5" />
-              <path d="M 1 1.5 L 13 10 L 25 1.5" />
+          <!-- 飘来的信：手绘抖边 -->
+          <g filter="url(#rough-mail)">
+            <g transform="translate(64 132) rotate(-10)">
+              <g class="letter">
+                <rect x="0" y="0" width="26" height="17" rx="1.5" />
+                <path d="M 1 1.5 L 13 10 L 25 1.5" />
+              </g>
+            </g>
+            <g transform="translate(238 150) rotate(9)" opacity="0.85">
+              <g class="letter l2">
+                <rect x="0" y="0" width="22" height="15" rx="1.5" />
+                <path d="M 1 1.5 L 11 8.5 L 21 1.5" />
+              </g>
+            </g>
+            <g transform="translate(250 78) rotate(-5) scale(0.7)" opacity="0.6">
+              <g class="letter l3">
+                <rect x="0" y="0" width="22" height="15" rx="1.5" />
+                <path d="M 1 1.5 L 11 8.5 L 21 1.5" />
+              </g>
             </g>
           </g>
-          <g transform="translate(238 150) rotate(9)" opacity="0.85">
-            <g class="letter l2">
-              <rect x="0" y="0" width="22" height="15" rx="1.5" />
-              <path d="M 1 1.5 L 11 8.5 L 21 1.5" />
-            </g>
+
+          <!-- 星点 -->
+          <g fill="#e8e8e8" stroke="none">
+            <use class="star s1" href="#sparkle" transform="translate(56 70)" />
+            <use class="star s2" href="#sparkle" transform="translate(286 220) scale(0.7)" />
+            <circle cx="36" cy="180" r="1" opacity="0.35" />
+            <circle cx="284" cy="120" r="1" opacity="0.35" />
           </g>
-          <g transform="translate(250 78) rotate(-5) scale(0.7)" opacity="0.6">
-            <g class="letter l3">
-              <rect x="0" y="0" width="22" height="15" rx="1.5" />
-              <path d="M 1 1.5 L 11 8.5 L 21 1.5" />
-            </g>
+
+          <!-- 信箱：手绘凿刻感 -->
+          <g class="mailbox" filter="url(#rough-mail)">
+            <path
+              d="M 108 150 A 52 46 0 0 1 212 150 L 212 286 Q 212 294 204 294 L 116 294 Q 108 294 108 286 Z"
+              opacity="0.9"
+            />
+            <path d="M 108 168 L 212 168" opacity="0.3" />
+            <rect x="124" y="188" width="72" height="11" rx="4" opacity="0.85" />
+            <circle cx="160" cy="220" r="2.6" opacity="0.7" />
+            <path d="M 160 223 L 160 230" opacity="0.5" />
+            <path d="M 96 294 L 224 294 L 224 304 L 96 304 Z" opacity="0.7" />
+          </g>
+
+          <!-- 地面与小草：同一份手绘感 -->
+          <g filter="url(#rough-mail)">
+            <path d="M 70 312 Q 160 302 250 312" opacity="0.4" />
+            <path d="M 44 319 Q 160 307 276 319" opacity="0.22" />
+            <path d="M 90 312 q -3 -8 -1 -12" opacity="0.4" />
+            <path d="M 232 313 q 4 -8 2 -12" opacity="0.4" />
           </g>
         </g>
-
-        <!-- 星点 -->
-        <g fill="#e8e8e8" stroke="none">
-          <use class="star s1" href="#sparkle" transform="translate(56 70)" />
-          <use class="star s2" href="#sparkle" transform="translate(286 220) scale(0.7)" />
-          <circle cx="36" cy="180" r="1" opacity="0.35" />
-          <circle cx="284" cy="120" r="1" opacity="0.35" />
-        </g>
-
-        <!-- 信箱：手绘凿刻感 -->
-        <g class="mailbox" filter="url(#rough-mail)">
-          <path
-            d="M 108 150 A 52 46 0 0 1 212 150 L 212 286 Q 212 294 204 294 L 116 294 Q 108 294 108 286 Z"
-            opacity="0.9"
-          />
-          <path d="M 108 168 L 212 168" opacity="0.3" />
-          <rect x="124" y="188" width="72" height="11" rx="4" opacity="0.85" />
-          <circle cx="160" cy="220" r="2.6" opacity="0.7" />
-          <path d="M 160 223 L 160 230" opacity="0.5" />
-          <path d="M 96 294 L 224 294 L 224 304 L 96 304 Z" opacity="0.7" />
-        </g>
-
-        <!-- 地面与小草：同一份手绘感 -->
-        <g filter="url(#rough-mail)">
-          <path d="M 70 312 Q 160 302 250 312" opacity="0.4" />
-          <path d="M 44 319 Q 160 307 276 319" opacity="0.22" />
-          <path d="M 90 312 q -3 -8 -1 -12" opacity="0.4" />
-          <path d="M 232 313 q 4 -8 2 -12" opacity="0.4" />
-        </g>
-      </g>
       </svg>
     </div>
 
@@ -144,11 +186,17 @@ function fmt(ts) {
     <header class="titleblock">
       <p class="title">趁我还在，想说的话</p>
       <p class="en">Say It While I'm Here</p>
-      <p class="counter">留言 · {{ voices.length }}</p>
-      <form class="addbar" @submit.prevent="add">
-        <input v-model="draft" placeholder="写一句想对「我」说的话" maxlength="60" />
-        <button type="submit">留下</button>
-      </form>
+      <p class="counter">留言 · {{ total }}</p>
+      <AddBar
+        v-model="draft"
+        v-model:name="nameDraft"
+        v-model:honeypot="hp"
+        name-placeholder="你的名字（可不填）"
+        placeholder="写一句想对「我」说的话"
+        :maxlength="60"
+        submit-label="留下"
+        @submit="add"
+      />
       <p v-if="postError" class="muterr">{{ postError }}</p>
     </header>
 
@@ -156,17 +204,14 @@ function fmt(ts) {
     <div class="listwrap">
       <template v-if="state === 'ready'">
         <ul class="list">
-          <li v-for="v in voices" :key="v.id">
+          <li v-for="(v, index) in voices" :key="v.id" :style="{ '--i': Math.min(index, 12) }">
             <p class="text">{{ v.text }}</p>
             <p class="meta">
+              <span class="who">{{ v.name || '匿名' }}</span>
               <span>{{ fmt(v.ts) }}</span>
-              <button
-                v-if="isAdmin"
-                class="del"
-                type="button"
-                title="删除留言"
-                @click="remove(v)"
-              >✕</button>
+              <button v-if="isAdmin" class="del" type="button" title="删除留言" @click="remove(v)">
+                ✕
+              </button>
             </p>
           </li>
           <li v-if="!voices.length" class="empty">还没有人来说过话。趁现在，说一句吧。</li>
@@ -345,55 +390,6 @@ function fmt(ts) {
   text-shadow: 0 0 10px rgba(0, 0, 0, 0.9);
 }
 
-.addbar {
-  display: flex;
-  align-items: stretch;
-  gap: 14px;
-  margin: 2vh 0 0;
-  width: min(430px, 36vw);
-}
-
-.addbar input {
-  flex: 1;
-  padding: 10px 2px;
-  background: none;
-  border: 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.3);
-  color: #eaeaea;
-  font: inherit;
-  font-size: 14px;
-  letter-spacing: 0.1em;
-  outline: none;
-  transition: border-color 0.3s;
-}
-
-.addbar input::placeholder {
-  color: #7c7c7c;
-}
-
-.addbar input:focus {
-  border-bottom-color: #b5b5b5;
-}
-
-.addbar button {
-  flex: none;
-  padding: 10px 22px;
-  border: 1px solid #6f6f6f;
-  background: none;
-  color: #c9c9c9;
-  font: inherit;
-  font-size: 12px;
-  letter-spacing: 0.4em;
-  text-indent: 0.4em;
-  cursor: pointer;
-  transition: color 0.3s, border-color 0.3s;
-}
-
-.addbar button:hover {
-  color: #fff;
-  border-color: #ddd;
-}
-
 .muterr {
   margin: 1.2vh 0 0;
   font-size: 11px;
@@ -435,6 +431,10 @@ li.empty {
   letter-spacing: 0.14em;
   line-height: 1.9;
   color: #e3e3e3;
+}
+
+.who {
+  color: #b5b5b5;
 }
 
 .meta {
@@ -521,28 +521,6 @@ li.empty {
 
   .veil.bottom {
     height: 14vh;
-  }
-
-  .addbar {
-    flex-direction: column;
-    gap: 12px;
-    width: auto;
-    margin: 2.4vh 0 0;
-  }
-
-  .addbar input {
-    width: 100%;
-    padding: 12px 14px;
-    font-size: 16px;
-    text-align: center;
-    background: rgba(255, 255, 255, 0.04);
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    border-radius: 6px;
-  }
-
-  .addbar button {
-    width: 100%;
-    padding: 12px;
   }
 
   .ghost {

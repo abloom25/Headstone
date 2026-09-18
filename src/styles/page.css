@@ -1,0 +1,349 @@
+/* PageScene（src/components/PageScene.vue）的版式：左边插画，右边一栏文字。
+   登录、初始化、未配置三页共用。
+
+   两条约束，改之前先读：
+
+   1) 所有选择器都圈在 .page 下。裸类名会泄漏——.panel / .title / .en / .scene
+      全站都在用，碑页的 .panel 是横向 flex，被这里的 flex-direction: column
+      漏进去压成了上下堆叠。命名空间是唯一拦得住的办法。
+
+   2) 用到这里定义的动画时，animation 声明也必须留在这个文件里。Vue 的 scoped
+      样式会给 @keyframes 加组件哈希，写回 scoped 里会被重命名成一个不存在的名字，
+      动画静默失效，且不报错。
+
+   页面自己的 scoped 样式权重与这里持平，靠 main.js 里的导入顺序取胜（全局在前）。 */
+
+/* --- 画布 --- */
+.page {
+  position: fixed;
+  inset: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-user-select: none;
+  user-select: none;
+  /* 细滚动条：留一点「下面还有」的提示，又不抢戏 */
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.16) transparent;
+}
+
+.page::-webkit-scrollbar {
+  width: 7px;
+}
+
+.page::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.page::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.16);
+  border-radius: 4px;
+}
+
+.page::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.28);
+}
+
+/* --- 背景描边巨字 --- */
+.page .ghost {
+  position: fixed;
+  z-index: 1;
+  right: 0;
+  top: 50%;
+  transform: translate(6%, -54%);
+  font-size: 76vh;
+  line-height: 1;
+  font-weight: 600;
+  color: transparent;
+  -webkit-text-stroke: 1.8px rgba(255, 255, 255, 0.07);
+  pointer-events: none;
+}
+
+@supports not (-webkit-text-stroke: 1px #fff) {
+  .page .ghost {
+    color: rgba(255, 255, 255, 0.035);
+  }
+}
+
+/* --- 左侧插画 --- */
+.page .ornament {
+  position: fixed;
+  z-index: 2;
+  left: 4vw;
+  top: 50%;
+  transform: translateY(-50%);
+  width: clamp(300px, 44vw, 640px);
+  pointer-events: none;
+  opacity: 0.9;
+  -webkit-mask-image: radial-gradient(100% 100% at 50% 42%, #000 45%, transparent 82%);
+  mask-image: radial-gradient(100% 100% at 50% 42%, #000 45%, transparent 82%);
+  animation: fade-in 0.9s ease both;
+}
+
+.page .art {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+/* 插画里飘着的小物件（信、钥匙、凿子、石块） */
+.page .drift {
+  animation: float-y 6s ease-in-out infinite;
+}
+
+.page .drift.d2 {
+  animation-delay: -2.4s;
+}
+
+.page .drift.d3 {
+  animation-delay: -4.2s;
+}
+
+.page .star {
+  animation: twinkle 3.6s ease-in-out infinite alternate;
+}
+
+.page .star.s2 {
+  animation-delay: 0.9s;
+}
+
+.page .star.s3 {
+  animation-delay: 1.7s;
+}
+
+.page .star.s4 {
+  animation-delay: 2.6s;
+}
+
+.page .star.s5 {
+  animation-delay: 1.2s;
+}
+
+.page .star.s6 {
+  animation-delay: 2.1s;
+}
+
+/* --- 上下遮罩：只柔化背后的插画，z-index 低于右栏 --- */
+.page .veil {
+  position: fixed;
+  left: 0;
+  right: 0;
+  height: 16vh;
+  z-index: 4;
+  pointer-events: none;
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
+}
+
+.page .veil.top {
+  top: 0;
+  background: linear-gradient(180deg, rgba(2, 2, 2, 0.55) 0%, rgba(2, 2, 2, 0) 100%);
+  -webkit-mask-image: linear-gradient(180deg, #000 0%, transparent 100%);
+  mask-image: linear-gradient(180deg, #000 0%, transparent 100%);
+}
+
+.page .veil.bottom {
+  bottom: 0;
+  height: 22vh;
+  background: linear-gradient(
+    0deg,
+    rgba(2, 2, 2, 0.78) 0%,
+    rgba(2, 2, 2, 0.45) 55%,
+    rgba(2, 2, 2, 0) 100%
+  );
+  -webkit-mask-image: linear-gradient(0deg, #000 0%, transparent 100%);
+  mask-image: linear-gradient(0deg, #000 0%, transparent 100%);
+}
+
+/* --- 右侧文字栏：z-index 高于遮罩，正文不会被 backdrop-filter 糊掉 --- */
+.page .panel {
+  position: relative;
+  z-index: 5;
+  width: min(520px, 38vw);
+  min-height: 100vh;
+  margin: 0 7vw 0 auto;
+  padding: 12vh 0 16vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  animation: fade-up 0.7s cubic-bezier(0.22, 1, 0.36, 1) 0.1s both;
+}
+
+/* 表头：跟内容一起滚，滚到顶就钉住，写入框始终够得着 */
+.page .head {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  padding: 3.4vh 0 2.6vh;
+  background: linear-gradient(180deg, rgba(2, 2, 2, 0.94) 64%, rgba(2, 2, 2, 0));
+}
+
+/* --- 文字 --- */
+.page .title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 400;
+  letter-spacing: 0.55em;
+  color: #c5c5c5;
+  text-shadow:
+    0 0 12px rgba(0, 0, 0, 0.9),
+    0 0 4px rgba(0, 0, 0, 0.8);
+}
+
+.page .en {
+  margin: 1.4vh 0 0;
+  font-size: 10px;
+  letter-spacing: 0.42em;
+  text-transform: uppercase;
+  color: #8a8a8a;
+  text-shadow: 0 0 10px rgba(0, 0, 0, 0.9);
+}
+
+.page .counter {
+  margin: 2.6vh 0 0;
+  font-size: 11px;
+  letter-spacing: 0.4em;
+  color: #9c9c9c;
+  text-shadow: 0 0 10px rgba(0, 0, 0, 0.9);
+}
+
+.page .muterr {
+  margin: 1.2vh 0 0;
+  font-size: 11px;
+  letter-spacing: 0.2em;
+  color: #b0b0b0;
+}
+
+.page .endhint {
+  margin: 3vh 0 0;
+  text-align: center;
+  font-size: 11px;
+  letter-spacing: 0.3em;
+  color: #8f8f8f;
+}
+
+.page .state {
+  margin: 4vh 0;
+  font-size: 13px;
+  letter-spacing: 0.3em;
+  color: #8a8a8a;
+  text-align: center;
+}
+
+.page .retry {
+  margin-left: 10px;
+  background: none;
+  border: 0;
+  color: #d0d0d0;
+  font: inherit;
+  font-size: 13px;
+  letter-spacing: 0.2em;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  cursor: pointer;
+}
+
+/* --- 竖栏列表 --- */
+.page .list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.page .list li {
+  padding: 1.7vh 2px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  animation: fade-up 0.55s ease both;
+  animation-delay: calc(var(--i, 0) * 60ms);
+}
+
+.page .num {
+  flex: none;
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  color: #8a8a8a;
+}
+
+/* --- 窄屏：插画在上、文字在下 --- */
+@media (max-width: 820px) {
+  .page .ghost {
+    font-size: 58vw;
+    top: 2vh;
+    transform: translate(8%, 0);
+  }
+
+  .page .ornament {
+    display: block;
+    position: relative;
+    left: 0;
+    top: 0;
+    transform: none;
+    width: 70vw;
+    margin: 12vh auto 0;
+  }
+
+  .page .panel {
+    width: auto;
+    min-height: 0;
+    margin: 2vh 8vw 0;
+    padding: 0 0 12vh;
+    text-align: center;
+  }
+
+  .page .head {
+    padding: 2vh 0;
+  }
+
+  .page .veil.top {
+    display: none;
+  }
+
+  .page .veil.bottom {
+    height: 14vh;
+  }
+
+  .page .list li {
+    text-align: left;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page .ornament,
+  .page .panel,
+  .page .list li,
+  .page .star,
+  .page .drift {
+    animation: none;
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+}
+
+@keyframes twinkle {
+  from {
+    opacity: 0.2;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes float-y {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-7px);
+  }
+}

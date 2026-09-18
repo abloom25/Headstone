@@ -18,13 +18,15 @@ function toggleCandle() {
     smokeTimer = setTimeout(() => (smoking.value = false), 6000)
   }
 }
-onBeforeUnmount(() => clearTimeout(smokeTimer))
 
 // 献花：位置按屏幕百分比记录；窗口尺寸一变就直接清空（重种即可）
 const flowers = ref([])
 let seq = 0
 function plantFlower(e) {
-  const x = Math.min(92, Math.max(8, (e.clientX / window.innerWidth) * 100 + (Math.random() * 8 - 4)))
+  const x = Math.min(
+    92,
+    Math.max(8, (e.clientX / window.innerWidth) * 100 + (Math.random() * 8 - 4)),
+  )
   const y = 78 + Math.random() * 8
   flowers.value.push({
     id: ++seq,

@@ -33,7 +33,14 @@ import epitaph from '../epitaph'
         stroke-width="1"
       />
 
-      <circle cx="160" cy="110" r="9" fill="none" stroke="rgba(255,255,255,0.35)" stroke-width="1" />
+      <circle
+        cx="160"
+        cy="110"
+        r="9"
+        fill="none"
+        stroke="rgba(255,255,255,0.35)"
+        stroke-width="1"
+      />
       <text x="160" y="148" class="rip">RIP</text>
       <text x="160" y="246" class="name">{{ epitaph.name }}</text>
       <text x="160" y="298" class="line">生于 · {{ epitaph.born }}</text>

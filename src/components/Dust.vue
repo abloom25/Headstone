@@ -1,6 +1,14 @@
 <script setup>
-// 缓缓下落的尘埃，让黑色背景有一点「呼吸感」
-const flakes = Array.from({ length: 42 }, (_, i) => ({
+// 缓缓下落的尘埃，让黑色背景有一点「呼吸感」。
+// 数量随屏幕收放：窄屏减半，声明了减少动效就一粒都不放——
+// 这一层要和两条 backdrop-filter、每页的 SVG 置换滤镜共享同一块 GPU。
+function grains() {
+  if (typeof window === 'undefined') return 42
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return 0
+  return window.innerWidth < 820 ? 18 : 42
+}
+
+const flakes = Array.from({ length: grains() }, (_, i) => ({
   id: i,
   left: Math.random() * 100,
   size: 1 + Math.random() * 2,

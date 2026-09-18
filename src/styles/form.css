@@ -1,0 +1,109 @@
+/* 写入栏。全站五个表单共用这一份：
+   AddBar.vue（愿、言）、登录、初始化、未配置。
+
+   这里用裸类名不加命名空间，因为 .addbar 全站只有表单在用，
+   不像 .panel / .title / .en 那样和别处撞名。
+
+   宽度走 --addbar-w：不传就占满容器（三个 PageScene 页面），
+   AddBar 通过 width prop 注入自己的桌面宽度。 */
+
+.addbar {
+  display: flex;
+  align-items: stretch;
+  gap: 14px;
+  margin: 2vh 0 0;
+  width: var(--addbar-w, 100%);
+}
+
+.addbar input {
+  flex: 1;
+  padding: 10px 2px;
+  background: none;
+  border: 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.3);
+  color: #eaeaea;
+  font: inherit;
+  font-size: 14px;
+  letter-spacing: 0.1em;
+  outline: none;
+  transition: border-color 0.3s;
+}
+
+.addbar input::placeholder {
+  color: #7c7c7c;
+}
+
+.addbar input:focus {
+  border-bottom-color: #b5b5b5;
+}
+
+.addbar button {
+  flex: none;
+  padding: 10px 22px;
+  border: 1px solid #6f6f6f;
+  background: none;
+  color: #c9c9c9;
+  font: inherit;
+  font-size: 12px;
+  letter-spacing: 0.4em;
+  text-indent: 0.4em;
+  cursor: pointer;
+  transition:
+    color 0.3s,
+    border-color 0.3s;
+}
+
+.addbar button:hover:not(:disabled) {
+  color: #fff;
+  border-color: #ddd;
+}
+
+.addbar button:disabled {
+  opacity: 0.5;
+  cursor: wait;
+}
+
+/* 竖排变体：多个输入框时一行一个（初始化页的两次密码） */
+.addbar.stack {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.6vh;
+}
+
+.addbar.stack input {
+  flex: none;
+  width: 100%;
+}
+
+.addbar.stack button {
+  margin-top: 1.8vh;
+}
+
+@media (max-width: 820px) {
+  .addbar {
+    flex-direction: column;
+    gap: 12px;
+    width: auto;
+    margin: 2.4vh 0 0;
+  }
+
+  .addbar.stack {
+    align-items: stretch;
+  }
+
+  /* 手机上换成有底的框，字号 16px 以免 iOS 聚焦时自动放大整页 */
+  .addbar input {
+    width: 100%;
+    padding: 12px 14px;
+    font-size: 16px;
+    text-align: center;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 6px;
+  }
+
+  .addbar button {
+    width: 100%;
+    padding: 12px;
+  }
+}

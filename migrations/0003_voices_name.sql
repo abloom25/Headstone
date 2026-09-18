@@ -1,0 +1,2 @@
+-- 0003: 留言增加署名字段
+ALTER TABLE voices ADD COLUMN name TEXT NOT NULL DEFAULT '';
