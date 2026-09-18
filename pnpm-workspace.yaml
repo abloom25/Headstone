@@ -1,0 +1,13 @@
+# 本项目是独立的 pnpm 根，不是任何工作区的成员。
+# 没有这个文件的话，pnpm 会一路往上找到 ~/pnpm-workspace.yaml，
+# 把本项目当成那个工作区的外围目录，install 直接跳过（报 "Already up to date" 却什么都不装）。
+packages:
+  - .
+
+# 需要跑安装脚本的原生依赖，白名单之外的一律不执行
+allowBuilds:
+  esbuild: true
+  workerd: true
+
+minimumReleaseAgeExclude:
+  - prettier@3.9.8

@@ -2,18 +2,41 @@
   "name": "rip",
   "private": true,
   "version": "0.1.0",
+  "description": "一座给自己的墓碑 —— 极简黑白的数字墓园",
   "type": "module",
+  "packageManager": "pnpm@11.5.3",
+  "engines": {
+    "node": ">=20",
+    "pnpm": ">=11.5.3"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/abloom25/Headstone.git"
+  },
+  "bugs": {
+    "url": "https://github.com/abloom25/Headstone/issues"
+  },
+  "homepage": "https://github.com/abloom25/Headstone#readme",
   "scripts": {
     "dev": "vite",
-    "api": "npm run build && wrangler pages dev dist --port 8788",
+    "api": "pnpm build && wrangler pages dev dist --port 8788",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "format": "prettier --write . --ignore-unknown",
+    "format:check": "prettier --check . --ignore-unknown",
+    "prepare": "husky"
   },
   "dependencies": {
-    "vue": "^3.5.13"
+    "vue": "^3.5.13",
+    "vue-router": "^4.6.4"
   },
   "devDependencies": {
+    "@commitlint/cli": "^21.2.2",
+    "@commitlint/config-conventional": "^21.2.2",
     "@vitejs/plugin-vue": "^5.2.1",
+    "husky": "^9.1.7",
+    "lint-staged": "^17.5.1",
+    "prettier": "^3.9.8",
     "vite": "^6.1.0",
     "wrangler": "^4.0.0"
   }
